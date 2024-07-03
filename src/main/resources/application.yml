@@ -1,1 +1,7 @@
-spring.application.name=pdf-invoice
+spring:
+  application:
+    name: pdf-invoice
+
+springdoc:
+  swagger-ui:
+    use-root-path: true

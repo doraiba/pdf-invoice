@@ -1,5 +1,6 @@
-package com.example.demo.util;
+package com.github.pdfinvoice.parse;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -9,109 +10,58 @@ import java.util.List;
 @Getter
 @Setter
 public class Invoice {
-    /**
-     * 标题
-     */
+
+    @Schema(description = "标题")
     private String title;
-    /**
-     * 机器编码
-     */
+    @Schema(description = "机器编码")
     private String machineNumber;
-    /**
-     *发票代码
-     */
+    @Schema(description = "发票代码")
     private String code;
-    /**
-     * 发票号码
-     */
+    @Schema(description = "发票号码")
     private String number;
-    /**
-     * 开票日期
-     */
+    @Schema(description = "开票日期")
     private String date;
-    /**
-     * 校验码
-     */
+    @Schema(description = "校验码")
     private String checksum;
-    /**
-     * 购方名称
-     */
+    @Schema(description = "购方名称")
     private String buyerName;
-    /**
-     * 购方纳税人识别号
-     */
+    @Schema(description = "购方纳税人识别号")
     private String buyerCode;
-    /**
-     * 购方地址
-     */
+    @Schema(description = "购方地址")
     private String buyerAddress;
-    /**
-     * 购方开户行及账号
-     */
+    @Schema(description = "购方开户行及账号")
     private String buyerAccount;
-    /**
-     * 密码区
-     */
+    @Schema(description = "密码区")
     private String password;
-    /**
-     * 金额
-     */
+    @Schema(description = "金额")
     private BigDecimal amount;
-    /**
-     * 税费
-     */
+    @Schema(description = "税费")
     private BigDecimal taxAmount;
-    /**
-     * 总金额 (金额+税费)
-     */
+    @Schema(description = "总金额 (金额+税费)")
     private String totalAmountString;
-    /**
-     * 总金额 (金额+税费)
-     */
+    @Schema(description = "总金额 (金额+税费)")
     private BigDecimal totalAmount;
-    /**
-     * 售方名称
-     */
+    @Schema(description = "售方名称")
     private String sellerName;
-    /**
-     * 售方纳税人识别号
-     */
+    @Schema(description = "售方纳税人识别号")
     private String sellerCode;
-    /**
-     * 售方地址
-     */
+    @Schema(description = "售方地址")
     private String sellerAddress;
-    /**
-     * 售方开户行及账号
-     */
+    @Schema(description = "售方开户行及账号")
     private String sellerAccount;
-    /**
-     * 备注
-     */
+    @Schema(description = "备注")
     private String remark;
-
-    /**
-     * 收款人
-     */
+    @Schema(description = "收款人")
     private String payee;
-    /**
-     * 复核
-     */
+    @Schema(description = "复核")
     private String reviewer;
-    /**
-     * 开票人
-     */
+    @Schema(description = "开票人")
     private String drawer;
-    /**
-     * 类型  普通发票/专用发票
-     */
+    @Schema(description = "类型  普通发票/专用发票")
     private String type;
-
+    @Schema(description = "明细首项名称")
     private String firstRecName;
-
-    /**
-     * 明细
-     */
+    @Schema(description = "明细")
     private List<Detail> detailList;
 
 }
@@ -119,13 +69,21 @@ public class Invoice {
 @Getter
 @Setter
 class Detail {
+    @Schema(description = "名称")
     private String name;
+    @Schema(description = "规格")
     private String model;
+    @Schema(description = "单位")
     private String unit;
+    @Schema(description = "数量")
     private String count;
+    @Schema(description = "单价")
     private String price;
+    @Schema(description = "价格")
     private String amount;
+    @Schema(description = "税率")
     private String taxRate;
+    @Schema(description = "税费")
     private String taxAmount;
 
 }

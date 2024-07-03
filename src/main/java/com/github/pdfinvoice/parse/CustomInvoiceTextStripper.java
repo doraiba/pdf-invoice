@@ -1,4 +1,4 @@
-package com.example.demo.util;
+package com.github.pdfinvoice.parse;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -214,8 +214,8 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
         map.put("tl", new Rectangle2D.Double(0, 0, fixedMid, map.get("购买方信息").getMinY() - 8.5));
         map.put("tr", new Rectangle2D.Double(fixedMid, 0, width - fixedMid, map.get("购买方信息").getMinY() - 8.5));
 
-        double minY = map.get("合计").getMinY() - 1;
-        double maxY = map.get("购买方信息").getMaxY() + 1;
+        double minY = map.get("合计").getMinY() + 1;
+        double maxY = map.get("购买方信息").getMaxY() - 1;
 
         Rectangle2D.Double detailRec = new Rectangle2D.Double(0, maxY, page.getCropBox().getWidth(), minY - maxY);
 
