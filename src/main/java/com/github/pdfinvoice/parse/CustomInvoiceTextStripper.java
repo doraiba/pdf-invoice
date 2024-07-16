@@ -14,6 +14,7 @@ import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotation;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAppearanceStream;
 import org.apache.pdfbox.text.PDFTextStripperByArea;
 import org.apache.pdfbox.text.TextPosition;
+import org.apache.pdfbox.text.TextPositionComparator;
 
 import java.awt.geom.Rectangle2D;
 import java.awt.geom.RectangularShape;
@@ -43,7 +44,7 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
     // 探测红色文字
     private boolean detachColorText;
 
-    private Predicate<PDColor> colorPredicate;
+    private BiPredicate<TextPosition, PDColor> colorPredicate;
     // 红色文字集合
     private final List<TextPosition> textPositions = new ArrayList<>();
 
@@ -93,9 +94,6 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
         orVerticalText.put("购买方信息", new ArrayList<>());
         orVerticalText.put("销售方信息", new ArrayList<>());
         orVerticalText.put("密码区", new ArrayList<>());
-
-        // 作为印章字体解析
-        horizonText.put("国家税务总局", new ArrayList<>());
 
         horizonText.put("发票号码", new ArrayList<>());
         horizonText.put("价税合计", new ArrayList<>());
@@ -169,6 +167,7 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
         // 解析颜色
         detachColorText = true;
 
+
         Map<String, List<TextPosition>> verticalText = orVerticalText.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> detachText(e.getKey(), e.getValue(), (k, v) -> Objects.equals(k.length(), v.size()) || (k.contains("方") && v.size() == 3))));
 
         Map<String, Rectangle2D> verticalCollect = verticalText.entrySet().stream().filter(e -> CollectionUtils.isNotEmpty(e.getValue())).collect(Collectors.toMap(Map.Entry::getKey, e -> getRectangle2D(e.getValue())));
@@ -198,7 +197,7 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
                         double v1 = e.getX() - 1;
                         return new Rectangle2D.Double(v.getX() + v.getWidth(), v.getY(), v1 - (v.getX() + v.getWidth()), v.getHeight());
                     }).orElseGet(() -> new Rectangle2D.Double(v.getX() + v.getWidth(), v.getY(), width - (v.getX() + v.getWidth()), v.getHeight()));
-                    return padding(rectangle2D, textHeight.get(entry.getKey()) * 0.9);
+                    return padding(rectangle2D, textHeight.get(entry.getKey()) * 0.8);
                 }));
 
         horizonCollect.forEach((k, v) -> {
@@ -206,27 +205,44 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
             map.put(k, new Rectangle2D.Double(0, padding.getY(), width, padding.getHeight()));
         });
 
-        Optional.ofNullable(map.get("备注")).filter(e -> e.getWidth() > width * 0.8).ifPresent(e -> {
-            map.put("备注", padding(e, textHeight.get("备注")));
-        });
+        Optional.ofNullable(map.get("备注")).ifPresent(e -> map.put("备注", padding(e, textHeight.get("备注"))));
 
         double fixedMid = fphm.getX() - 1;
-        map.put("tl", new Rectangle2D.Double(0, 0, fixedMid, map.get("购买方信息").getMinY() - 8.5));
-        map.put("tr", new Rectangle2D.Double(fixedMid, 0, width - fixedMid, map.get("购买方信息").getMinY() - 8.5));
+        Rectangle2D gmfxx = map.get("购买方信息");
+
+        map.put("tl", new Rectangle2D.Double(0, 0, fixedMid, gmfxx.getMinY() - 8.5));
+        map.put("tr", new Rectangle2D.Double(fixedMid, 0, width - fixedMid, gmfxx.getMinY() - 8.5));
+
+        final double y = gmfxx.getY();
+        this.colorPredicate = (t, c) -> {
+            boolean b = t.getY() < y;
+            if (!b) {
+                return false;
+            }
+            float[] components = c.getComponents();
+            if (components.length == 0) {
+                return false;
+            }
+            return components[0] == 1.0F;
+        };
 
         double minY = map.get("合计").getMinY() + 1;
-        double maxY = map.get("购买方信息").getMaxY() - 1;
+        double maxY = gmfxx.getMaxY() - 1;
+
 
         Rectangle2D.Double detailRec = new Rectangle2D.Double(0, maxY, page.getCropBox().getWidth(), minY - maxY);
 
         List<List<TextPosition>> detailLines = detailLines(page, detailRec);
 
 
-        map.forEach(this::addRegion);
+        map.entrySet().stream()
+                .forEach(entry -> this.addRegion(entry.getKey(), entry.getValue()));
+
+
         this.extractRegions(page);
-        Map<String, String> result = map.keySet().stream()
-                .collect(Collectors.toMap(Function.identity(),
-                        e -> Optional.ofNullable(this.getTextForRegion(e)).map(t -> REPLACEMENTS.entrySet().stream().reduce(t, (s, en) -> s.replaceAll(en.getKey(), en.getValue()), (a, b) -> a)).orElse("")));
+        Map<String, String> result = map.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                        e -> Optional.ofNullable(this.getTextForRegion(e.getKey())).map(t -> REPLACEMENTS.entrySet().stream().reduce(t, (s, en) -> s.replaceAll(en.getKey(), en.getValue()), (a, b) -> a)).orElse("")));
         String reduce = result.entrySet().stream()
                 .map(e -> "----------" + e.getKey() + "----------\n" + e.getValue())
                 .reduce("", (a, b) -> a + b);
@@ -325,9 +341,10 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
         Optional.ofNullable(result.get("购买方信息")).map(this::replace).ifPresent(e -> {
             Map<Integer, String> collect = IntStream.range(0, subject.size())
                     .boxed()
-                    .collect(HashMap::new, (m, i) -> m.put(i, get(Pattern.compile(subject.get(i) + "\\x20?\\S\\x20?([^\n\r]+)"), e, 1)), HashMap::putAll);
+                    .collect(HashMap::new, (m, i) -> m.put(i, get(Pattern.compile(subject.get(i) + "\\x20*\\S\\x20?([^\n\r]+)"), e, 1)), HashMap::putAll);
             invoice.setBuyerName(collect.get(0));
-            invoice.setBuyerCode(collect.get(1));
+            Optional.ofNullable(collect.get(1)).map(t -> t.replaceAll("\\x20", "")).ifPresent(invoice::setBuyerCode);
+//            invoice.setBuyerCode(collect.get(1));
             invoice.setBuyerAddress(collect.get(2));
             invoice.setBuyerAccount(collect.get(3));
         });
@@ -335,9 +352,10 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
         Optional.ofNullable(result.get("销售方信息")).ifPresent(e -> {
             Map<Integer, String> collect = IntStream.range(0, subject.size())
                     .boxed()
-                    .collect(HashMap::new, (m, i) -> m.put(i, get(Pattern.compile(subject.get(i) + "\\x20?\\S\\x20?([^\n\r]+)"), e, 1)), HashMap::putAll);
+                    .collect(HashMap::new, (m, i) -> m.put(i, get(Pattern.compile(subject.get(i) + "\\x20*\\S\\x20?([^\n\r]+)"), e, 1)), HashMap::putAll);
             invoice.setSellerName(collect.get(0));
-            invoice.setSellerCode(collect.get(1));
+            Optional.ofNullable(collect.get(1)).map(t -> t.replaceAll("\\x20", "")).ifPresent(invoice::setSellerCode);
+//            invoice.setSellerCode(collect.get(1));
             invoice.setSellerAddress(collect.get(2));
             invoice.setSellerAccount(collect.get(3));
         });
@@ -373,7 +391,6 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
             l.add(Pair.of(pair.getLeft(), Pair.of(left, right)));
             return l;
         }, (a, b) -> a);
-
 
         List<List<List<TextPosition>>> detailRec = detailLines.stream().skip(1)
                 .filter(e -> e.stream().anyMatch(t -> Objects.equals(t.getUnicode(), "*")))
@@ -469,25 +486,14 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
         super.writeString(collect, textPositions);
     }
 
-    /**
-     * 附件剔除
-     *
-     * @param annotation The annotation containing the appearance stream to process.
-     * @param appearance The appearance stream to process.
-     * @throws IOException
-     */
-    @Override
-    protected void processAnnotation(PDAnnotation annotation, PDAppearanceStream appearance) throws IOException {
-        //
-//        super.processAnnotation(annotation, appearance);
-    }
-
 
     @Override
     protected void endPage(PDPage page) throws IOException {
         // 清理红颜色文字集合
         textPositions.clear();
         super.endPage(page);
+
+
     }
 
 
@@ -496,9 +502,11 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
 
         String unicode = REPLACEMENTS.getOrDefault(text.getUnicode(), text.getUnicode());
 
+//        System.out.printf("%s %s%n",unicode, Arrays.toString(getGraphicsState().getNonStrokingColor().getComponents()));
+
         if (detachColorText && Objects.nonNull(colorPredicate)) {
             PDColor color = getGraphicsState().getNonStrokingColor();
-            if (colorPredicate.test(color)) {
+            if (colorPredicate.test(text, color)) {
                 textPositions.add(text);
             }
         }
@@ -513,13 +521,13 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
             return;
         }
 
+
         orVerticalText.forEach((k, v) -> {
             if (!k.contains(unicode)) {
                 return;
             }
             v.add(text);
         });
-
 
         List<Map.Entry<String, List<TextPosition>>> list = new ArrayList<>(horizonText.entrySet());
         IntStream.range(0, list.size()).forEach(i -> {
@@ -545,18 +553,19 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
             }
         });
 
-        //如果发片国家税务总局字样 获取文字的颜色作为过滤用
-        String spkey = "国家税务总局";
-        List<TextPosition> splist = horizonText.get(spkey);
-        if (CollectionUtils.isNotEmpty(splist) && Objects.equals(spkey.length(), splist.size())) {
-            if (text.getY() > text.getPageHeight() / 5) {
-                splist.clear();
-                return;
-            }
-            PDColor color = getGraphicsState().getNonStrokingColor();
-            this.colorPredicate = (c) -> Objects.equals(c.toString(), color.toString());
-            horizonText.remove(spkey);
-        }
+
+//        //如果发片国家税务总局字样 获取文字的颜色作为过滤用
+//        String spkey = "国家税务总局";
+//        List<TextPosition> splist = horizonText.get(spkey);
+//        if (CollectionUtils.isNotEmpty(splist) && Objects.equals(spkey.length(), splist.size())) {
+//            if (text.getY() > text.getPageHeight() / 5) {
+//                splist.clear();
+//                return;
+//            }
+//            PDColor color = getGraphicsState().getNonStrokingColor();
+//            this.colorPredicate = (c) -> Arrays.equals(c.getComponents(), color.getComponents());
+//            horizonText.remove(spkey);
+//        }
 
 
     }
@@ -564,10 +573,6 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
 
     // ========================== tools
 
-    public static String find(Pattern pattern, String content) {
-        Matcher matcher = pattern.matcher(content);
-        return matcher.find() ? matcher.group() : null;
-    }
 
     public static List<String> findAll(Pattern pattern, CharSequence content, int group) {
         return findAll(pattern, content, group, new ArrayList<>());
