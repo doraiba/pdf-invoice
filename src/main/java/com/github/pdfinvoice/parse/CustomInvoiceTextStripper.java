@@ -10,11 +10,8 @@ import org.apache.pdfbox.contentstream.operator.color.*;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.graphics.color.PDColor;
-import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotation;
-import org.apache.pdfbox.pdmodel.interactive.annotation.PDAppearanceStream;
 import org.apache.pdfbox.text.PDFTextStripperByArea;
 import org.apache.pdfbox.text.TextPosition;
-import org.apache.pdfbox.text.TextPositionComparator;
 
 import java.awt.geom.Rectangle2D;
 import java.awt.geom.RectangularShape;
@@ -25,7 +22,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -235,8 +231,7 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
         List<List<TextPosition>> detailLines = detailLines(page, detailRec);
 
 
-        map.entrySet().stream()
-                .forEach(entry -> this.addRegion(entry.getKey(), entry.getValue()));
+        map.forEach(this::addRegion);
 
 
         this.extractRegions(page);
@@ -310,14 +305,14 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
         });
         Optional.ofNullable(result.get("密码区")).map(String::trim).ifPresent(invoice::setPassword);
         Optional.ofNullable(result.get("备注")).map(String::trim).ifPresent(invoice::setRemark);
-        Pattern moneyPattern = Pattern.compile("-?\\d+(\\.\\d+)?");
+
         Optional.ofNullable(result.get("价税合计")).ifPresent(e -> {
-            String jshj = Objects.requireNonNull(get(moneyPattern, e, 0), "总价未知: " + e);
+            String jshj = Objects.requireNonNull(get(Pattern.compile("价税合计[^0-9-]+(-?\\d+(\\.\\d+)?)"), e, 1), "总价未知: " + e);
             invoice.setTotalAmountString(jshj);
             invoice.setTotalAmount(new BigDecimal(jshj));
         });
         Optional.ofNullable(result.get("合计")).ifPresent(e -> {
-            List<String> hj = findAll(moneyPattern, e, 0);
+            List<String> hj = findAll(Pattern.compile("-?\\d+(\\.\\d+)?"), e, 0);
             if (hj.size() < 2) hj.add("0");
             invoice.setAmount(new BigDecimal(hj.get(0)));
             invoice.setTaxAmount(new BigDecimal(hj.get(1)));
