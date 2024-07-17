@@ -56,6 +56,7 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
     private static final Map<String, String> REPLACEMENTS = new HashMap<>();
     private static final List<Pattern> PATTERNS;
 
+    private String tag = UUID.randomUUID().toString();
     // 数据
     private Invoice invoice;
 
@@ -66,6 +67,11 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
         REPLACEMENTS.put("⾦", "金");
 
         PATTERNS = Stream.of("[^\\x20]+名称", "规格型号", "单[^\u4e00-\u9fa5]*位", "数[^\u4e00-\u9fa5]*量", "单[^\u4e00-\u9fa5]*价", "[金⾦][^\u4e00-\u9fa5]*额", "税[^\u4e00-\u9fa5]*率(\\/征收率)?", "税[^\u4e00-\u9fa5]*额").map(e -> Pattern.compile(e, Pattern.DOTALL)).collect(Collectors.toList());
+    }
+
+
+    public void setTag(String tag) {
+        this.tag = tag;
     }
 
     public CustomInvoiceTextStripper(PDDocument document) throws Exception {
@@ -246,14 +252,14 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
                 .collect(Collectors.toMap(Map.Entry::getKey,
                         e -> Optional.ofNullable(this.getTextForRegion(e.getKey())).map(t -> REPLACEMENTS.entrySet().stream().reduce(t, (s, en) -> s.replaceAll(en.getKey(), en.getValue()), (a, b) -> a)).orElse("")));
         String reduce = result.entrySet().stream()
-                .map(e -> "----------" + e.getKey() + "----------\n" + e.getValue())
+                .map(e -> ">>>[" + e.getKey() + "]<<<\n" + e.getValue())
                 .reduce("", (a, b) -> a + b);
-        log.info("解析内容: \n{}", reduce);
 
-        String r = detailLines.stream()
+
+        String r = fixedDetails.stream()
                 .map(l -> l.stream().map(TextPosition::getUnicode).collect(Collectors.joining()))
                 .collect(Collectors.joining("\n"));
-        log.info("解析详情内容: \n{}", r);
+        log.info("================={}=================\n==基础信息== \n{}\n==明细== \n{}", tag, reduce, r);
         parseInvoice(result, fixedDetails);
 
     }
@@ -310,7 +316,7 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
             invoice.setMachineNumber(jqbh);
 
         });
-        Optional.ofNullable(result.get("密码区")).map(String::trim).ifPresent(invoice::setPassword);
+        Optional.ofNullable(result.get("密码区")).map(e -> e.replaceAll("\\s", "")).ifPresent(invoice::setPassword);
         Optional.ofNullable(result.get("备注")).map(String::trim).ifPresent(invoice::setRemark);
 
         Optional.ofNullable(result.get("价税合计")).ifPresent(e -> {
