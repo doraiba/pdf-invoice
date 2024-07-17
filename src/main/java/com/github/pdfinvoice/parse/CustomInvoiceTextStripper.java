@@ -232,10 +232,12 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
 
 
         map.forEach(this::addRegion);
+//        addRegion("价税合计",map.get("价税合计"));
 
 
         this.extractRegions(page);
         Map<String, String> result = map.entrySet().stream()
+                .filter(entry -> getRegions().contains(entry.getKey()))
                 .collect(Collectors.toMap(Map.Entry::getKey,
                         e -> Optional.ofNullable(this.getTextForRegion(e.getKey())).map(t -> REPLACEMENTS.entrySet().stream().reduce(t, (s, en) -> s.replaceAll(en.getKey(), en.getValue()), (a, b) -> a)).orElse("")));
         String reduce = result.entrySet().stream()
@@ -497,7 +499,7 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
 
         String unicode = REPLACEMENTS.getOrDefault(text.getUnicode(), text.getUnicode());
 
-//        System.out.printf("%s %s%n",unicode, Arrays.toString(getGraphicsState().getNonStrokingColor().getComponents()));
+//        System.out.printf("%s %s%n", unicode, text.getX() + "," + text.getY());
 
         if (detachColorText && Objects.nonNull(colorPredicate)) {
             PDColor color = getGraphicsState().getNonStrokingColor();
@@ -531,7 +533,7 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
             List<TextPosition> v = entry.getValue();
             if (v.size() >= k.length()) return;
 
-            if (!k.contains(unicode)) {
+            if (!Objects.equals(k.charAt(v.size())+"",unicode)) {
                 if (!Objects.equals(v.size(), k.length())) {
                     v.clear();
                 }
@@ -549,18 +551,6 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
         });
 
 
-//        //如果发片国家税务总局字样 获取文字的颜色作为过滤用
-//        String spkey = "国家税务总局";
-//        List<TextPosition> splist = horizonText.get(spkey);
-//        if (CollectionUtils.isNotEmpty(splist) && Objects.equals(spkey.length(), splist.size())) {
-//            if (text.getY() > text.getPageHeight() / 5) {
-//                splist.clear();
-//                return;
-//            }
-//            PDColor color = getGraphicsState().getNonStrokingColor();
-//            this.colorPredicate = (c) -> Arrays.equals(c.getComponents(), color.getComponents());
-//            horizonText.remove(spkey);
-//        }
 
 
     }
