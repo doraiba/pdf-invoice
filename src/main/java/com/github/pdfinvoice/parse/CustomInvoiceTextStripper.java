@@ -230,6 +230,13 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
 
         List<List<TextPosition>> detailLines = detailLines(page, detailRec);
 
+        int titleIndex = IntStream.range(0, detailLines.size()).filter(i -> {
+            String s = detailLines.get(i).stream().map(TextPosition::getUnicode).collect(Collectors.joining());
+            long c = PATTERNS.stream().map(Pattern::asPredicate).filter(e -> e.test(s)).count();
+            return c >= 4;
+        }).findFirst().orElseThrow(() -> new IllegalArgumentException("发票明细解析异常"));
+
+        List<List<TextPosition>> fixedDetails = detailLines.subList(titleIndex, detailLines.size());
 
         map.forEach(this::addRegion);
 
@@ -247,7 +254,7 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
                 .map(l -> l.stream().map(TextPosition::getUnicode).collect(Collectors.joining()))
                 .collect(Collectors.joining("\n"));
         log.info("解析详情内容: \n{}", r);
-        parseInvoice(result, detailLines);
+        parseInvoice(result, fixedDetails);
 
     }
 
