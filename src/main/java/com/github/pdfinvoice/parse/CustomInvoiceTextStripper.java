@@ -193,7 +193,7 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
                         double v1 = e.getX() - 1;
                         return new Rectangle2D.Double(v.getX() + v.getWidth(), v.getY(), v1 - (v.getX() + v.getWidth()), v.getHeight());
                     }).orElseGet(() -> new Rectangle2D.Double(v.getX() + v.getWidth(), v.getY(), width - (v.getX() + v.getWidth()), v.getHeight()));
-                    return padding(rectangle2D, textHeight.get(entry.getKey()) * 0.8);
+                    return padding(rectangle2D, textHeight.get(entry.getKey()) * 0.9);
                 }));
 
         horizonCollect.forEach((k, v) -> {
@@ -223,7 +223,7 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
         };
 
         double minY = map.get("合计").getMinY() + 1;
-        double maxY = gmfxx.getMaxY() - 1;
+        double maxY = gmfxx.getMaxY() - textHeight.get("购买方信息") * 0.9 + 1;
 
 
         Rectangle2D.Double detailRec = new Rectangle2D.Double(0, maxY, page.getCropBox().getWidth(), minY - maxY);
@@ -232,8 +232,6 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
 
 
         map.forEach(this::addRegion);
-//        addRegion("价税合计",map.get("价税合计"));
-
 
         this.extractRegions(page);
         Map<String, String> result = map.entrySet().stream()
@@ -533,7 +531,7 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
             List<TextPosition> v = entry.getValue();
             if (v.size() >= k.length()) return;
 
-            if (!Objects.equals(k.charAt(v.size())+"",unicode)) {
+            if (!Objects.equals(k.charAt(v.size()) + "", unicode)) {
                 if (!Objects.equals(v.size(), k.length())) {
                     v.clear();
                 }
@@ -549,8 +547,6 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
                 v.add(text);
             }
         });
-
-
 
 
     }
