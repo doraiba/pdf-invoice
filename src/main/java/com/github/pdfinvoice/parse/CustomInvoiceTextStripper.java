@@ -133,13 +133,18 @@ public class CustomInvoiceTextStripper extends PDFTextStripperByArea {
         return textPositions.stream().filter(e -> Objects.equals(e.getUnicode(), c)).map(e -> {
             List<TextPosition> list = new ArrayList<>();
             list.add(e);
-            // 备注 两字纵向差值 30多, 防止距离远的纵向字被包含
-            float fpt = 40F;
-            return textPositions.stream().filter(t -> !Objects.equals(e, t)).reduce(list, (l, t) -> {
+            int i = textPositions.indexOf(e);
+            return textPositions.subList(i, textPositions.size()).stream().filter(t -> !Objects.equals(e, t)).reduce(list, (l, t) -> {
                 TextPosition cur = l.get(l.size() - 1);
                 float absX = Math.abs(t.getX() - cur.getX());
-                float absY = t.getY() - cur.getY();
-                if (absX < pt && absY > 0 && absY < fpt) {
+                boolean add = true;
+                if (l.size() >= 2) {
+                    float absY = t.getY() - cur.getY();
+                    TextPosition prev = l.get(l.size() - 2);
+                    float prevAbsY = cur.getY() - prev.getY();
+                    add = Math.abs(absY - prevAbsY) < 2;
+                }
+                if (absX < pt && add) {
                     l.add(t);
                 }
                 return l;
